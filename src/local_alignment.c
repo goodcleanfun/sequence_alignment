@@ -28,38 +28,38 @@ alignment_ops_t affine_gap_align_op_counts_unicode_options(uint32_array *u1_arra
     uint32_t *u1 = u1_array->a;
     uint32_t *u2 = u2_array->a;
 
-    alignment_ops_t edits = NULL_ALIGNMENT_OPS;
+    alignment_ops_t result = NULL_ALIGNMENT_OPS;
 
     if (unicode_equals(u1_array, u2_array)) {
-        edits.num_matches = n;
-        return edits;
+        result.num_matches = n;
+        return result;
     }
 
     size_t num_bytes = (m + 1) * sizeof(size_t);
 
-    size_t *C = malloc(num_bytes);
-    if (C == NULL) {
+    size_t *costs = malloc(num_bytes);
+    if (costs == NULL) {
         return NULL_ALIGNMENT_OPS;
     }
 
-    size_t *D = malloc(num_bytes);
-    if (D == NULL) {
-        free(C);
+    size_t *gap_costs = malloc(num_bytes);
+    if (gap_costs == NULL) {
+        free(costs);
         return NULL_ALIGNMENT_OPS;
     }
 
-    alignment_ops_t *E = malloc((m + 1) * sizeof(alignment_ops_t));
-    if (E == NULL) {
-        free(C);
-        free(D);
+    alignment_ops_t *edits = malloc((m + 1) * sizeof(alignment_ops_t));
+    if (edits == NULL) {
+        free(costs);
+        free(gap_costs);
         return NULL_ALIGNMENT_OPS;
     }
 
-    alignment_ops_t *ED = malloc((m + 1) * sizeof(alignment_ops_t));
-    if (ED == NULL) {
-        free(C);
-        free(D);
-        free(E);
+    alignment_ops_t *gap_edits = malloc((m + 1) * sizeof(alignment_ops_t));
+    if (gap_edits == NULL) {
+        free(costs);
+        free(gap_costs);
+        free(edits);
         return NULL_ALIGNMENT_OPS;
     }
 
@@ -71,8 +71,8 @@ alignment_ops_t affine_gap_align_op_counts_unicode_options(uint32_array *u1_arra
 
     size_t e = 0, c = 0, s = 0;
 
-    C[0] = 0;
-    E[0] = NULL_ALIGNMENT_OPS;
+    costs[0] = 0;
+    edits[0] = NULL_ALIGNMENT_OPS;
     size_t t = gap_open_cost;
 
     alignment_ops_t base_edits = NULL_ALIGNMENT_OPS;
@@ -80,11 +80,11 @@ alignment_ops_t affine_gap_align_op_counts_unicode_options(uint32_array *u1_arra
 
     for (size_t j = 1; j < m + 1; j++) {
         t += gap_extend_cost;
-        C[j] = t;
-        D[j] = t + gap_open_cost;
+        costs[j] = t;
+        gap_costs[j] = t + gap_open_cost;
         base_edits.num_gap_extensions++;
-        E[j] = base_edits;
-        ED[j] = base_edits;
+        edits[j] = base_edits;
+        gap_edits[j] = base_edits;
     }
 
     t = gap_open_cost;
@@ -99,17 +99,17 @@ alignment_ops_t affine_gap_align_op_counts_unicode_options(uint32_array *u1_arra
 
     for (size_t i = 1; i < n + 1; i++) {
         // s = CC[0]
-        s = C[0];
+        s = costs[0];
         uint32_t c2 = u2[i - 1];
         // CC[0] = c = t = t + h
         t += gap_extend_cost;
         c = t;
-        C[0] = c;
+        costs[0] = c;
         
-        prev_row_prev_char_edits = E[0];
+        prev_row_prev_char_edits = edits[0];
         base_edits.num_gap_extensions++;
         prev_char_edits = base_edits;
-        E[0] = prev_char_edits;
+        edits[0] = prev_char_edits;
 
         // e = t + g
         e = t + gap_open_cost;
@@ -143,20 +143,20 @@ alignment_ops_t affine_gap_align_op_counts_unicode_options(uint32_array *u1_arra
 
             alignment_op delete_op = ALIGN_GAP_OPEN;
 
-            min = D[j];
-            alignment_ops_t delete_edits = ED[j];
+            min = gap_costs[j];
+            alignment_ops_t delete_edits = gap_edits[j];
             alignment_ops_t delete_edits_stored = delete_edits;
             delete_op = ALIGN_GAP_OPEN;
-            if (C[j] + gap_open_cost < min) {
-                min = C[j] + gap_open_cost;
+            if (costs[j] + gap_open_cost < min) {
+                min = costs[j] + gap_open_cost;
                 
-                delete_edits = delete_edits_stored = E[j];
+                delete_edits = delete_edits_stored = edits[j];
                 delete_edits_stored.num_gap_opens++;
             }
 
-            D[j] = min + gap_extend_cost;
+            gap_costs[j] = min + gap_extend_cost;
             delete_edits_stored.num_gap_extensions++;
-            ED[j] = delete_edits_stored;
+            gap_edits[j] = delete_edits_stored;
 
             // Cost
             // c = min(DD[j], e, s + w(a, b))
@@ -164,7 +164,7 @@ alignment_ops_t affine_gap_align_op_counts_unicode_options(uint32_array *u1_arra
             alignment_op current_op = delete_op;
 
 
-            min = D[j];
+            min = gap_costs[j];
 
             // Delete transition
             current_edits = delete_edits;
@@ -223,17 +223,17 @@ alignment_ops_t affine_gap_align_op_counts_unicode_options(uint32_array *u1_arra
             }
 
             c = min;
-            s = C[j];
-            C[j] = c;
+            s = costs[j];
+            costs[j] = c;
 
             prev_char_edits = current_edits;
-            prev_row_prev_char_edits = E[j];
-            E[j] = prev_char_edits;
+            prev_row_prev_char_edits = edits[j];
+            edits[j] = prev_char_edits;
 
             // In the case of a transposition, duplicate costs for next character and advance by 2
             if (current_op == ALIGN_TRANSPOSE) {
-                E[j + 1] = E[j];
-                C[j + 1] = C[j];
+                edits[j + 1] = edits[j];
+                costs[j + 1] = costs[j];
                 j++;
             }
         }
@@ -244,13 +244,13 @@ alignment_ops_t affine_gap_align_op_counts_unicode_options(uint32_array *u1_arra
 
     }
 
-    edits = E[m];
-    free(C);
-    free(D);
-    free(E);
-    free(ED);
+    result = edits[m];
+    free(costs);
+    free(gap_costs);
+    free(edits);
+    free(gap_edits);
 
-    return edits;
+    return result;
 
 }
 
