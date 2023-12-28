@@ -1,0 +1,18 @@
+{
+    "name": "string_alignment",
+    "version": "0.0.0",
+    "repo": "goodcleanfun/string_alignment",
+    "description": "Local and global string alignment algorithms",
+    "keywords": [],
+    "license": "MIT",
+    "dependencies": {
+      "goodcleanfun/utf8": "*",
+      "goodcleanfun/utf8proc": "*"
+    },
+    "src": [
+      "src/alignment.h",
+      "src/local_alignment.h",
+      "src/local_alignment.c"
+    ]
+    
+  }
