@@ -9,6 +9,9 @@
       "goodcleanfun/utf8": "*",
       "goodcleanfun/utf8proc": "*"
     },
+    "development": {
+      "silentbicycle/greatest": "*"
+    },
     "src": [
       "src/alignment.h",
       "src/local_alignment.h",
