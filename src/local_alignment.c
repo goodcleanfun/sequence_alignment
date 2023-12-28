@@ -10,7 +10,7 @@ static alignment_ops_t NULL_ALIGNMENT_OPS = {
     .num_gap_extensions = 0
 };
 
-static inline bool utf8_is_non_character(int32_t c) {
+static inline bool utf8_is_non_alphanumeric(int32_t c) {
     int cat = utf8proc_category(c);
     return utf8_is_whitespace(c) || utf8_is_hyphen(c) || utf8_is_punctuation(cat);
 }
@@ -88,10 +88,14 @@ alignment_ops_t affine_gap_align_op_counts_unicode_options(uint32_array *u1_arra
     size_t match_cost = options.match_cost;
     size_t mismatch_cost = options.mismatch_cost;
     size_t transpose_cost = options.transpose_cost;
+    bool ignore_non_alphanumeric = options.ignore_non_alphanumeric;
 
     size_t e = 0, c = 0, s = 0;
 
+    size_t max_cost = m + n;
+
     costs[0] = 0;
+    gap_costs[0] = max_cost;
     edits[0] = NULL_ALIGNMENT_OPS;
     size_t t = gap_open_cost;
 
@@ -117,6 +121,7 @@ alignment_ops_t affine_gap_align_op_counts_unicode_options(uint32_array *u1_arra
     alignment_ops_t prev_row_prev2_char_edits = NULL_ALIGNMENT_OPS;
 
     bool in_gap = false;
+    size_t prev_c = 0;
 
     for (size_t i = 1; i < n + 1; i++) {
         // s = CC[0]
@@ -139,10 +144,7 @@ alignment_ops_t affine_gap_align_op_counts_unicode_options(uint32_array *u1_arra
 
         alignment_op op = ALIGN_GAP_OPEN;
 
-        ssize_t match_at = -1;
-
-        size_t min_at = 0;
-        size_t min_cost = SIZE_MAX;
+        size_t min_cost = max_cost;
 
         for (size_t j = 1; j < m + 1; j++) {
             // insertion
@@ -198,10 +200,11 @@ alignment_ops_t affine_gap_align_op_counts_unicode_options(uint32_array *u1_arra
                 current_edits = prev_char_edits;
             }
 
-            bool both_non_characters = utf8_is_non_character((int32_t)c1) && utf8_is_non_character((int32_t)c2);
+            bool c1_non_alphanumeric = utf8_is_non_alphanumeric((int32_t)c1);
+            bool c2_non_alphanumeric = utf8_is_non_alphanumeric((int32_t)c2);
+            bool both_non_alphanumeric = c1_non_alphanumeric && c2_non_alphanumeric;
 
-            bool is_transpose = false;
-            size_t w = c1 != c2 && !both_non_characters ? mismatch_cost : match_cost;
+            size_t w = c1 != c2 && !both_non_alphanumeric ? mismatch_cost : match_cost;
 
             if (s + w < min) {
                 min = s + w;
@@ -209,9 +212,9 @@ alignment_ops_t affine_gap_align_op_counts_unicode_options(uint32_array *u1_arra
                 // Match/mismatch/transpose transition
                 current_edits = prev_row_prev_char_edits;
 
-                if ((c1 == c2 || both_non_characters)) {
+                if ((c1 == c2 || both_non_alphanumeric)) {
                     current_op = ALIGN_MATCH;
-                } else if (!is_transpose) {
+                } else {
                     current_op = ALIGN_MISMATCH;
                 }
             }
@@ -227,11 +230,13 @@ alignment_ops_t affine_gap_align_op_counts_unicode_options(uint32_array *u1_arra
             }
 
             if (current_op == ALIGN_MATCH) {
-                if (!both_non_characters) {
+                if (!both_non_alphanumeric) {
                     current_edits.num_matches++;
                 }
             } else if (current_op == ALIGN_MISMATCH) {
-                current_edits.num_mismatches++;
+                if (!c1_non_alphanumeric && !c2_non_alphanumeric) {
+                    current_edits.num_mismatches++;
+                }
             } else if (current_op == ALIGN_GAP_EXTEND) {
                 current_edits.num_gap_extensions++;
             } else if (current_op == ALIGN_GAP_OPEN) {
@@ -239,12 +244,6 @@ alignment_ops_t affine_gap_align_op_counts_unicode_options(uint32_array *u1_arra
                 current_edits.num_gap_extensions++;
             } else if (current_op == ALIGN_TRANSPOSE) {
                 current_edits.num_transpositions++;
-            }
-
-            if (min < min_cost) {
-                op = current_op;
-                min_cost = min;
-                min_at = j;
             }
 
             prev_row_prev2_cost = prev_costs[j];

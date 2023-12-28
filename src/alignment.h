@@ -11,7 +11,7 @@ typedef struct {
     size_t transpose_cost;
     bool prefix_gap;
     bool suffix_gap;
-    bool mismatches_alphanumeric_only;
+    bool ignore_non_alphanumeric;
 } alignment_options_t;
 
 
@@ -19,13 +19,15 @@ static const alignment_options_t DEFAULT_ALIGNMENT_OPTIONS_AFFINE_GAP = {
     .gap_open_cost = 3,
     .gap_extend_cost = 2,
     .match_cost = 0,
-    .mismatch_cost = 6,  // Should be greater than (gap_open_cost + gap_extend_cost)
-    .transpose_cost = 4, // Should be less than 2x mismatch_cost
+    .mismatch_cost = 6,  // Should be greater than or equal to (gap_open_cost + gap_extend_cost)
+    .transpose_cost = 4, // Should be less than 2x mismatch_cost, ideally equal, should be less than (gap_open_cost + 2 x gap_extend_cost)
     .prefix_gap = false,
-    .suffix_gap = false
+    .suffix_gap = false,
+    .ignore_non_alphanumeric = true
 };
 
 typedef enum {
+    ALIGN_NO_OP = 0,
     ALIGN_MATCH,
     ALIGN_MISMATCH,
     ALIGN_TRANSPOSE,
