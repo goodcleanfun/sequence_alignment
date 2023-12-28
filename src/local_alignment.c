@@ -42,24 +42,44 @@ alignment_ops_t affine_gap_align_op_counts_unicode_options(uint32_array *u1_arra
         return NULL_ALIGNMENT_OPS;
     }
 
+    size_t *prev_costs = malloc(num_bytes);
+    if (prev_costs == NULL) {
+        free(costs);
+        return NULL_ALIGNMENT_OPS;
+    }
+
     size_t *gap_costs = malloc(num_bytes);
     if (gap_costs == NULL) {
+        free(prev_costs);
         free(costs);
         return NULL_ALIGNMENT_OPS;
     }
 
     alignment_ops_t *edits = malloc((m + 1) * sizeof(alignment_ops_t));
     if (edits == NULL) {
-        free(costs);
         free(gap_costs);
+        free(prev_costs);
+        free(costs);
+        return NULL_ALIGNMENT_OPS;
+    }
+
+
+    alignment_ops_t *prev_edits = malloc((m + 1) * sizeof(alignment_ops_t));
+    if (prev_edits == NULL) {
+        free(edits);
+        free(gap_costs);
+        free(prev_costs);
+        free(costs);
         return NULL_ALIGNMENT_OPS;
     }
 
     alignment_ops_t *gap_edits = malloc((m + 1) * sizeof(alignment_ops_t));
     if (gap_edits == NULL) {
-        free(costs);
-        free(gap_costs);
+        free(prev_edits);
         free(edits);
+        free(gap_costs);
+        free(prev_costs);
+        free(costs);
         return NULL_ALIGNMENT_OPS;
     }
 
@@ -94,6 +114,7 @@ alignment_ops_t affine_gap_align_op_counts_unicode_options(uint32_array *u1_arra
     alignment_ops_t current_edits = NULL_ALIGNMENT_OPS;
     alignment_ops_t prev_char_edits = NULL_ALIGNMENT_OPS;
     alignment_ops_t prev_row_prev_char_edits = NULL_ALIGNMENT_OPS;
+    alignment_ops_t prev_row_prev2_char_edits = NULL_ALIGNMENT_OPS;
 
     bool in_gap = false;
 
@@ -105,6 +126,8 @@ alignment_ops_t affine_gap_align_op_counts_unicode_options(uint32_array *u1_arra
         t += gap_extend_cost;
         c = t;
         costs[0] = c;
+        size_t prev_row_prev_cost = c;
+        size_t prev_row_prev2_cost;  // cost for the previous row two characters ago for transposes
         
         prev_row_prev_char_edits = edits[0];
         base_edits.num_gap_extensions++;
@@ -126,6 +149,8 @@ alignment_ops_t affine_gap_align_op_counts_unicode_options(uint32_array *u1_arra
             // e = min(e, c + g) + h
             size_t min = e;
             uint32_t c1 = u1[j - 1];
+
+            current_edits = edits[j];
 
             alignment_op insert_op = ALIGN_GAP_OPEN;
 
@@ -150,7 +175,7 @@ alignment_ops_t affine_gap_align_op_counts_unicode_options(uint32_array *u1_arra
             if (costs[j] + gap_open_cost < min) {
                 min = costs[j] + gap_open_cost;
                 
-                delete_edits = delete_edits_stored = edits[j];
+                delete_edits_stored = edits[j];
                 delete_edits_stored.num_gap_opens++;
             }
 
@@ -166,9 +191,6 @@ alignment_ops_t affine_gap_align_op_counts_unicode_options(uint32_array *u1_arra
 
             min = gap_costs[j];
 
-            // Delete transition
-            current_edits = delete_edits;
-
             if (e < min) {
                 min = e;
                 // Insert transition
@@ -181,23 +203,26 @@ alignment_ops_t affine_gap_align_op_counts_unicode_options(uint32_array *u1_arra
             bool is_transpose = false;
             size_t w = c1 != c2 && !both_non_characters ? mismatch_cost : match_cost;
 
-            if (c1 != c2 && j < m && !both_non_characters && c2 == u1[j] && i < n && c1 == u2[i]) {
-                w = transpose_cost;
-                is_transpose = true;
-            }
-
             if (s + w < min) {
                 min = s + w;
 
                 // Match/mismatch/transpose transition
                 current_edits = prev_row_prev_char_edits;
 
-                if ((c1 == c2 || both_non_characters) && !is_transpose) {
+                if ((c1 == c2 || both_non_characters)) {
                     current_op = ALIGN_MATCH;
                 } else if (!is_transpose) {
                     current_op = ALIGN_MISMATCH;
-                } else if (is_transpose) {
+                }
+            }
+
+            if (j > 1 && i > 1 && c1 == u2[i - 2] && c2 == u1[j - 2] && c1 != u1[j - 2]) {
+                if (prev_row_prev2_cost + transpose_cost < min) {
+                    s = prev_row_prev2_cost;
+                    w = transpose_cost;
+                    min = s + w;
                     current_op = ALIGN_TRANSPOSE;
+                    current_edits = prev_row_prev2_char_edits;
                 }
             }
 
@@ -222,37 +247,36 @@ alignment_ops_t affine_gap_align_op_counts_unicode_options(uint32_array *u1_arra
                 min_at = j;
             }
 
+            prev_row_prev2_cost = prev_costs[j];
+            prev_costs[j] = prev_row_prev_cost;
+            prev_row_prev_cost = costs[j];
+
             c = min;
             s = costs[j];
             costs[j] = c;
 
-            prev_char_edits = current_edits;
+            prev_row_prev2_char_edits = prev_edits[j];
+            prev_edits[j] = prev_row_prev_char_edits;
             prev_row_prev_char_edits = edits[j];
-            edits[j] = prev_char_edits;
 
-            // In the case of a transposition, duplicate costs for next character and advance by 2
-            if (current_op == ALIGN_TRANSPOSE) {
-                edits[j + 1] = edits[j];
-                costs[j + 1] = costs[j];
-                j++;
-            }
+            prev_char_edits = current_edits;
+            edits[j] = current_edits;
+
         }
-
-        if (op == ALIGN_TRANSPOSE) {
-            i++;
-        }
-
     }
 
     result = edits[m];
     free(costs);
+    free(prev_costs);
     free(gap_costs);
     free(edits);
+    free(prev_edits);
     free(gap_edits);
 
     return result;
 
 }
+
 
 alignment_ops_t affine_gap_align_op_counts_unicode(uint32_array *u1_array, uint32_array *u2_array) {
     return affine_gap_align_op_counts_unicode_options(u1_array, u2_array, DEFAULT_ALIGNMENT_OPTIONS_AFFINE_GAP);
