@@ -32,53 +32,36 @@ alignment_ops_t affine_gap_align_op_counts_options(const char *s1, size_t m, con
         return result;
     }
 
-    size_t num_bytes = (m + 1) * sizeof(size_t);
-
-    size_t *costs = malloc(num_bytes);
-    if (costs == NULL) {
+    // Costs are a 3 x (m + 1) matrix, only uses 3 rows
+    size_t *all_costs = malloc((m + 1) * 3 * sizeof(size_t));
+    if (all_costs == NULL) {
         return NULL_ALIGNMENT_OPS;
     }
 
-    size_t *prev_costs = malloc(num_bytes);
-    if (prev_costs == NULL) {
-        free(costs);
+    // Costs for the current row, CC in the Myers-Miller paper
+    size_t *costs = all_costs;
+    // Costs for previous row, used for transpositions as in Damerau-Levenshtein
+    // This will track the cost at the i-1, j-2 position in order to revert back
+    // to the cost at that position if the transpose is cheaper
+    size_t *prev_costs = all_costs + (m + 1);
+    // Gap costs for inserts/deletes, DD in the Myers-Miller paper
+    size_t *gap_costs = all_costs + 2 * (m + 1);
+
+    // Edits are a 3 x (m + 1) matrix of alignment op counts, a breakdown of the cost by type
+    alignment_ops_t *all_edits = malloc(3 * (m + 1) * sizeof(alignment_ops_t));
+    if (all_edits == NULL) {
+        free(all_costs);
         return NULL_ALIGNMENT_OPS;
     }
 
-    size_t *gap_costs = malloc(num_bytes);
-    if (gap_costs == NULL) {
-        free(prev_costs);
-        free(costs);
-        return NULL_ALIGNMENT_OPS;
-    }
-
-    alignment_ops_t *edits = malloc((m + 1) * sizeof(alignment_ops_t));
-    if (edits == NULL) {
-        free(gap_costs);
-        free(prev_costs);
-        free(costs);
-        return NULL_ALIGNMENT_OPS;
-    }
-
-
-    alignment_ops_t *prev_edits = malloc((m + 1) * sizeof(alignment_ops_t));
-    if (prev_edits == NULL) {
-        free(edits);
-        free(gap_costs);
-        free(prev_costs);
-        free(costs);
-        return NULL_ALIGNMENT_OPS;
-    }
-
-    alignment_ops_t *gap_edits = malloc((m + 1) * sizeof(alignment_ops_t));
-    if (gap_edits == NULL) {
-        free(prev_edits);
-        free(edits);
-        free(gap_costs);
-        free(prev_costs);
-        free(costs);
-        return NULL_ALIGNMENT_OPS;
-    }
+    // Edits for the current row
+    alignment_ops_t *edits = all_edits;
+    // Edits for the previous row, used for transpositions in order to
+    // revert back to the edits at the i - 1, j -2 at the end of the transpose
+    // if the transpose is cheaper
+    alignment_ops_t *prev_edits = all_edits + (m + 1);
+    // Edits for the current row, only for insertions/deletions
+    alignment_ops_t *gap_edits = all_edits + 2 * (m + 1);
 
     size_t gap_open_cost = options.gap_open_cost;
     size_t gap_extend_cost = options.gap_extend_cost;
@@ -281,12 +264,8 @@ alignment_ops_t affine_gap_align_op_counts_options(const char *s1, size_t m, con
     }
 
     result = edits[m];
-    free(costs);
-    free(prev_costs);
-    free(gap_costs);
-    free(edits);
-    free(prev_edits);
-    free(gap_edits);
+    free(all_costs);
+    free(all_edits);
 
     return result;
 
