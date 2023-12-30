@@ -5,7 +5,6 @@
 Tests for local affine gap alignment with op counts
 */
 
-
 TEST test_affine_gap_op_count_correctness(void) {
     const char *s1 = "bam 30 lafyette ave bk new yrok";
     const char *s2 = "brooklyn academy of music 30 lafayette avenue brooklyn new york";
@@ -18,7 +17,6 @@ TEST test_affine_gap_op_count_correctness(void) {
 
     PASS();
 }
-
 
 // From Flouri, Kobert, Rognes and Stamatakis, 2015 "Are all global alignment algorithms and implementations correct?"
 TEST test_sequence_alignment_symmetric(void) {
