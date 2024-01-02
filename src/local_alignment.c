@@ -279,8 +279,8 @@ static bool affine_gap_costs_options(const char *s1, size_t m, const char *s2, s
                     current_ops.num_delete_gap_extensions++;
                 }
             } else if (current_op == ALIGN_DELETE_GAP_OPEN) {
+                current_ops.num_delete_gap_opens++;
                 if (!c2_non_alphanumeric || !ignore_non_alphanumeric) {
-                    current_ops.num_delete_gap_opens++;
                     current_ops.num_delete_gap_extensions++;
                 }
             } else if (current_op == ALIGN_INSERT_GAP_EXTEND) {
@@ -288,8 +288,8 @@ static bool affine_gap_costs_options(const char *s1, size_t m, const char *s2, s
                     current_ops.num_insert_gap_extensions++;
                 }
             } else if (current_op == ALIGN_INSERT_GAP_OPEN) {
+                current_ops.num_insert_gap_opens++;
                 if (!c2_non_alphanumeric || !ignore_non_alphanumeric) {
-                    current_ops.num_insert_gap_opens++;
                     current_ops.num_insert_gap_extensions++;
                 }
             } else if (current_op == ALIGN_TRANSPOSE) {
