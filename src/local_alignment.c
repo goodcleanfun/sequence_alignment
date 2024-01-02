@@ -357,10 +357,10 @@ bool affine_gap_align_op_counts_options(const char *s1, size_t m, const char *s2
 
 bool affine_gap_align_op_counts(const char *s1, const char *s2, alignment_ops_t *result) {
     if (s1 == NULL || s2 == NULL) return false;
-    size_t s1_len = strlen(s1);
-    size_t m = utf8_len(s1, s1_len);
-    size_t s2_len = strlen(s2);
-    size_t n = utf8_len(s2, s2_len);
+    size_t s1_size = strlen(s1) + 1;
+    size_t m = utf8_len(s1, s1_size);
+    size_t s2_size = strlen(s2) + 1;
+    size_t n = utf8_len(s2, s2_size);
     return affine_gap_align_op_counts_options(s1, m, s2, n, DEFAULT_ALIGNMENT_OPTIONS_AFFINE_GAP, result);
 }
 
