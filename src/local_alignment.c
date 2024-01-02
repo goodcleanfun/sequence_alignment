@@ -143,6 +143,8 @@ static bool affine_gap_costs_options(const char *s1, size_t m, const char *s2, s
         }
         if (c2 == 0) break;
 
+        bool c2_non_alphanumeric = utf8_is_non_alphanumeric((int32_t)c2);
+
         // CC[0] = c = t = t + h
         t += insert_gap_extend_cost;
         c = t;
@@ -182,7 +184,8 @@ static bool affine_gap_costs_options(const char *s1, size_t m, const char *s2, s
             }
             if (c1 == 0) break;
 
-            current_ops = ops[j];
+            bool c1_non_alphanumeric = utf8_is_non_alphanumeric((int32_t)c1);
+            bool both_non_alphanumeric = c1_non_alphanumeric && c2_non_alphanumeric;
 
             alignment_op insert_op = ALIGN_INSERT_GAP_OPEN;
 
@@ -194,6 +197,8 @@ static bool affine_gap_costs_options(const char *s1, size_t m, const char *s2, s
             }
 
             e = min + insert_gap_extend_cost;
+
+            current_ops = ops[j];
 
             // deletion
             // DD[j] = min(DD[j], CC[j] + g) + h
@@ -232,12 +237,8 @@ static bool affine_gap_costs_options(const char *s1, size_t m, const char *s2, s
                 current_ops = prev_char_ops;
             }
 
-            bool c1_non_alphanumeric = utf8_is_non_alphanumeric((int32_t)c1);
-            bool c2_non_alphanumeric = utf8_is_non_alphanumeric((int32_t)c2);
-            bool both_non_alphanumeric = c1_non_alphanumeric && c2_non_alphanumeric;
-
             size_t w;
-            if (c1 != c2) {
+            if (c1 != c2 && !both_non_alphanumeric) {
                 w = mismatch_cost;
             } else {
                 w = match_cost;
@@ -271,7 +272,7 @@ static bool affine_gap_costs_options(const char *s1, size_t m, const char *s2, s
                     current_ops.num_matches++;
                 }
             } else if (current_op == ALIGN_MISMATCH) {
-                if (!both_non_alphanumeric && !ignore_non_alphanumeric) {
+                if ((!c1_non_alphanumeric && !c2_non_alphanumeric) || !ignore_non_alphanumeric) {
                     current_ops.num_mismatches++;
                 }
             } else if (current_op == ALIGN_DELETE_GAP_EXTEND) {
@@ -289,7 +290,7 @@ static bool affine_gap_costs_options(const char *s1, size_t m, const char *s2, s
                 }
             } else if (current_op == ALIGN_INSERT_GAP_OPEN) {
                 current_ops.num_insert_gap_opens++;
-                if (!c2_non_alphanumeric || !ignore_non_alphanumeric) {
+                if (!c1_non_alphanumeric || !ignore_non_alphanumeric) {
                     current_ops.num_insert_gap_extensions++;
                 }
             } else if (current_op == ALIGN_TRANSPOSE) {
