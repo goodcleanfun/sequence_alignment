@@ -1,6 +1,6 @@
 {
     "name": "string_alignment",
-    "version": "0.1.0",
+    "version": "0.2.0",
     "repo": "goodcleanfun/string_alignment",
     "description": "Local and global string alignment algorithms",
     "keywords": [],
